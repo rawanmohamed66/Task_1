@@ -71,40 +71,29 @@ export async function createPerk(req, res, next) {
 // Update an existing perk by ID and validate only the fields that are being updated 
 export async function updatePerk(req, res, next) {
   try {
-    if (Object.keys(req.body).length === 0) {
-      return res.status(400).json({ message: 'No fields provided to update' });
+        const updateSchema = Joi.object({
+        title: Joi.string().min(2),
+        description: Joi.string().allow(''),
+        category: Joi.string().valid('food','tech','travel','fitness','other'),
+        discountPercent: Joi.number().min(0).max(100),
+        merchant: Joi.string().allow('')
+        });
+
+        const { value, error } = updateSchema.validate(req.body, { stripUnknown: true });
+        if (error) return res.status(400).json({ message: error.message });
+
+        const updated = await Perk.findByIdAndUpdate(
+        req.params.id,
+        { $set: value },
+        { new: true, runValidators: true }
+        );
+
+        if (!updated) return res.status(404).json({ message: 'Perk not found' });
+        res.json({ perk: updated });
+        } catch (err) {
+        next(err);
+        }
     }
-    const partialSchema = perkSchema.fork(Object.keys(perkSchema.describe().keys), (field) =>
-      req.body.hasOwnProperty(field) ? field : field.optional()
-    );
-
-    const { value, error } = partialSchema.validate(req.body, {
-      abortEarly: false,
-      allowUnknown: false,
-    });
-
-    if (error) return res.status(400).json({ message: error.message });
-    const updatedPerk = await Perk.findByIdAndUpdate(
-      req.params.id,
-      { $set: value },
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedPerk) return res.status(404).json({ message: 'Perk not found' });
-
-    res.json({
-      success: true,
-      message: 'Perk updated successfully',
-      data: updatedPerk,
-    });
-  } catch (err) {
-    if (err.code === 11000) {
-      return res.status(409).json({ message: 'Duplicate perk for this merchant' });
-    }
-    next(err);
-  }
-}
-   
 
 // Delete a perk by ID
 export async function deletePerk(req, res, next) {
